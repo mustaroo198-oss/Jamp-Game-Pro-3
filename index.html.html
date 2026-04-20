@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Jump Game: Final Version</title>
+    <style>
+        :root { --primary: #2563eb; --ui-panel: #1e293b; --accent: #ef4444; }
+        body { margin: 0; padding: 0; overflow: hidden; font-family: 'Segoe UI', sans-serif; background: #000; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #game-wrapper { position: relative; width: 100%; max-width: 450px; height: 100vh; background: #111; overflow: hidden; border-left: 2px solid #333; border-right: 2px solid #333; }
+        
+        .screen { position: absolute; width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; background: rgba(2, 6, 23, 0.98); color: white; text-align: center; }
+        .login-card, .death-card { background: white; padding: 30px; border-radius: 20px; color: #1e293b; width: 80%; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .login-card input, .login-card select { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; box-sizing: border-box; }
+        
+        .tab-container { display: flex; gap: 10px; margin-bottom: 10px; }
+        .tab-btn { background: #334155; padding: 8px 15px; border-radius: 5px; cursor: pointer; color: white; }
+        .tab-btn.active { background: var(--primary); }
+        
+        .levels-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; width: 95%; max-height: 50vh; overflow-y: auto; padding: 10px; border: 1px solid #333; border-radius: 10px; }
+        .level-box { height: 45px; background: var(--ui-panel); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; cursor: pointer; font-size: 14px; }
+        .level-box.unlocked { background: var(--primary); border: 1px solid #60a5fa; color: white; }
+        
+        .shop-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; width: 90%; max-height: 45vh; overflow-y: auto; padding: 10px; }
+        .shop-item { background: var(--ui-panel); padding: 10px; border-radius: 12px; cursor: pointer; border: 2px solid transparent; font-size: 11px; color: white; }
+        .shop-item.active { border-color: #fbbf24; }
+        
+        canvas { display: block; background: #020617; }
+        #ui-overlay { position: absolute; top: 10px; width: 100%; display: flex; justify-content: space-around; align-items: center; z-index: 10; pointer-events: none; }
+        .stat-badge { background: rgba(0,0,0,0.7); padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 12px; color: white; }
+        #mobile-controls { position: absolute; bottom: 30px; width: 100%; display: none; justify-content: space-between; padding: 0 25px; box-sizing: border-box; }
+        .ctrl-btn { width: 65px; height: 65px; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; pointer-events: auto; color: white; }
+        button { padding: 10px 20px; border-radius: 8px; border: none; font-weight: bold; cursor: pointer; background: var(--primary); color: white; margin: 5px; }
+        button:disabled { background: #ccc; cursor: not-allowed; opacity: 0.5; }
+    </style>
+</head>
+<body>
+
+<audio id="snd-bg" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3"></audio>
+<audio id="snd-coin" src="https://assets.mixkit.co/active_storage/sfx/2019/2019-preview.mp3"></audio>
+
+<div id="game-wrapper">
+    <div id="login-screen" class="screen">
+        <div class="login-card">
+            <h2 style="color: var(--primary); margin-top:0;">تسجيل الدخول 🚀</h2>
+            <input type="text" id="user" placeholder="اسم المستخدم">
+            <input type="password" id="pass" placeholder="كلمه المرور">
+            <select id="deviceType">
+                <option value="pc">كمبيوتر</option>
+                <option value="mobile" selected>موبايل</option>
+            </select>
+            <button onclick="login()" style="width:100%;">ابدأ</button>
+        </div>
+    </div>
+
+    <div id="death-screen" class="screen" style="display:none;">
+        <div class="death-card">
+            <h2 style="color: var(--accent); margin-top:0;">انتهت القلوب! 💔</h2>
+            <p>اختر وسيلة للعودة:</p>
+            <button id="revive-btn" onclick="revive()" style="width:100%; background: #22c55e;">2 قلب زيادة ❤️❤️</button>
+            <button onclick="enterSecretCode('death')" style="width:100%; background: #444; margin-top:10px;">أدخل كود سري 🔑</button>
+            <button onclick="showMenu()" style="width:100%; background: #64748b; margin-top:10px;">العودة للقائمة</button>
+        </div>
+    </div>
+
+    <div id="level-menu" class="screen" style="display:none">
+        <h2>المراحل (1 - 30)</h2>
+        <p style="color:#fbbf24">💰 الذهب الإجمالي: <span id="total-coins-ui">0</span></p>
+        <div class="levels-grid" id="levels-grid"></div>
+        <button onclick="openShop()" style="background:#fbbf24; color:black; width:80%; margin-top: 15px;">المتجر 🛒</button>
+        <div style="display:flex; gap:10px;">
+            <button onclick="enterSecretCode('menu')" style="background:#444; font-size:10px;">كود</button>
+            <button onclick="resetData()" style="background:red; font-size:10px;">مسح</button>
+        </div>
+    </div>
+
+    <div id="shop-screen" class="screen" style="display:none">
+        <div class="tab-container">
+            <div id="tab-colors" class="tab-btn active" onclick="switchTab('colors')">الألوان</div>
+            <div id="tab-power" class="tab-btn" onclick="switchTab('power')">المعدات</div>
+        </div>
+        <div class="shop-grid" id="shop-grid"></div>
+        <button onclick="showMenu()">رجوع</button>
+    </div>
+
+    <div id="game-container" style="display:none">
+        <div id="ui-overlay">
+            <button onclick="showMenu()" style="pointer-events:auto; background:red;">🔙</button>
+            <div class="stat-badge" id="lives-ui">❤️❤️❤️</div>
+            <div class="stat-badge">🟡 <span id="lvl-coins">0</span></div>
+            <div class="stat-badge">📏 <span id="progress-text">0</span>/100</div>
+        </div>
+        <canvas id="canvas"></canvas>
+        <div id="mobile-controls">
+            <div class="ctrl-btn" onpointerdown="touchX='left'" onpointerup="touchX=null">◀</div>
+            <div class="ctrl-btn" onpointerdown="touchX='right'" onpointerup="touchX=null">▶</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const allSkins = Array.from({length: 30}, (_, i) => ({ color: `hsl(${i * 12}, 70%, 50%)`, price: i * 20 }));
+    const powerItems = [
+        {id: 'magnet', name: 'مغناطيس', price: 100, icon: '🧲'},
+        {id: 'shield', name: 'درع', price: 150, icon: '🛡️'},
+        {id: 'jump', name: 'سوبر نطة', price: 75, icon: '🚀'}
+    ];
+
+    let unlockedLevels, totalCoins, activeSkin, ownedSkins, inventory;
+    let isGodMode = false, currentTab = 'colors', canRevive = true, isGameInitialized = false;
+
+    function loadData() {
+        unlockedLevels = parseInt(localStorage.getItem('jump_30_master_lv')) || 1;
+        totalCoins = parseInt(localStorage.getItem('jump_30_master_coins')) || 0;
+        activeSkin = localStorage.getItem('jump_30_master_skin') || allSkins[0].color;
+        ownedSkins = JSON.parse(localStorage.getItem('jump_30_master_owned')) || [allSkins[0].color];
+        inventory = JSON.parse(localStorage.getItem('jump_30_master_inv')) || {magnet:0, shield:0, jump:0};
+    }
+    loadData();
+
+    let currentLevel = 1, isRunning = false, device = 'pc';
+    let player, platforms = [], coins = [], powerups = [], keys = {}, touchX = null;
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const sndBg = document.getElementById('snd-bg');
+    const sndCoin = document.getElementById('snd-coin');
+
+    function login() {
+        if(document.getElementById('user').value === "admin" && document.getElementById('pass').value === "123456") {
+            device = document.getElementById('deviceType').value;
+            document.getElementById('login-screen').style.display='none';
+            showMenu();
+        } else alert("بيانات خاطئة!");
+    }
+
+    function showMenu() {
+        isRunning = false; isGameInitialized = false; sndBg.pause();
+        document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+        document.getElementById('level-menu').style.display = 'flex';
+        document.getElementById('game-container').style.display = 'none';
+        document.getElementById('total-coins-ui').innerText = isGodMode ? "999,999" : totalCoins;
+        
+        const grid = document.getElementById('levels-grid'); grid.innerHTML = '';
+        for(let i=1; i<=30; i++) {
+            const div = document.createElement('div');
+            div.className = `level-box ${i <= unlockedLevels ? 'unlocked' : ''}`;
+            div.innerText = i <= unlockedLevels ? i : '🔒';
+            if(i <= unlockedLevels) div.onclick = () => startLevel(i);
+            grid.appendChild(div);
+        }
+    }
+
+    function switchTab(t) { currentTab = t; openShop(); }
+
+    function openShop() {
+        document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+        document.getElementById('shop-screen').style.display='flex';
+        const grid = document.getElementById('shop-grid'); grid.innerHTML = '';
+        document.getElementById('tab-colors').className = currentTab === 'colors' ? 'tab-btn active' : 'tab-btn';
+        document.getElementById('tab-power').className = currentTab === 'power' ? 'tab-btn active' : 'tab-btn';
+
+        if(currentTab === 'colors') {
+            allSkins.forEach(s => {
+                const owned = ownedSkins.includes(s.color);
+                const div = document.createElement('div');
+                div.className = `shop-item ${activeSkin === s.color ? 'active' : ''}`;
+                div.innerHTML = `<div style="background:${s.color};height:20px;border-radius:3px;"></div><br>${owned ? 'ممتلك' : s.price}`;
+                div.onclick = () => {
+                    if(owned) { activeSkin = s.color; save(); openShop(); }
+                    else if(totalCoins >= s.price || isGodMode) { if(!isGodMode) totalCoins -= s.price; ownedSkins.push(s.color); save(); openShop(); }
+                };
+                grid.appendChild(div);
+            });
+        } else {
+            powerItems.forEach(p => {
+                const div = document.createElement('div');
+                div.className = `shop-item`;
+                div.innerHTML = `<div>${p.icon}</div><b>${p.name}</b><br>${p.price}<br>لديك: ${inventory[p.id]}`;
+                div.onclick = () => {
+                    if(totalCoins >= p.price || isGodMode) { if(!isGodMode) totalCoins -= p.price; inventory[p.id]++; save(); openShop(); }
+                };
+                grid.appendChild(div);
+            });
+        }
+    }
+
+    function startLevel(lvl) {
+        currentLevel = lvl; isRunning = true; isGameInitialized = true; canRevive = true;
+        document.getElementById('revive-btn').disabled = false;
+        document.getElementById('revive-btn').innerText = "2 قلب زيادة ❤️❤️";
+        document.querySelectorAll('.screen').forEach(s => s.style.display = 'none');
+        document.getElementById('game-container').style.display = 'block';
+        document.getElementById('mobile-controls').style.display = (device==='mobile')?'flex':'none';
+        sndBg.play(); resize(); initGame(); gameLoop();
+    }
+
+    function initGame() {
+        let diff = currentLevel / 30;
+        player = { x: canvas.width/2-17, y: canvas.height-100, w:34, h:34, vx:0, vy:0, jump: -15-(diff*2), speed: 7+(diff*4), coins:0, count:0, dir:'right', lives: isGodMode?999:3, power: null, powerTimer: 0 };
+        
+        // استخدام الدرع لو متاح
+        if(inventory.shield > 0) { player.power = 'shield'; inventory.shield--; save(); }
+
+        platforms = [{x:0, y:canvas.height-40, w:canvas.width, h:20, id:0}];
+        coins = []; powerups = [];
+        for(let i=1; i<=100; i++) {
+            let pw = Math.max(45, 85-(diff*40));
+            let px = Math.random()*(canvas.width-pw), py = canvas.height-(i*(110+(diff*40)));
+            platforms.push({x:px, y:py, w:pw, h:15, id:i});
+            if(Math.random()>0.4) coins.push({x:px+(pw/2), y:py-20, taken:false});
+            if(Math.random()>0.95) powerups.push({x:px+(pw/2)-10, y:py-30, type: Math.random()>0.5?'magnet':'jump', taken:false});
+        }
+        updateUI();
+    }
+
+    function update() {
+        if(!isRunning) return;
+        if(keys['ArrowLeft'] || touchX==='left') { player.vx = -player.speed; player.dir='left'; }
+        else if(keys['ArrowRight'] || touchX==='right') { player.vx = player.speed; player.dir='right'; }
+        else player.vx = 0;
+
+        player.vy += 0.6; player.x += player.vx; player.y += player.vy;
+        if(player.x<0) player.x=0; if(player.x+player.w > canvas.width) player.x=canvas.width-player.w;
+
+        platforms.forEach(p => {
+            if(player.vy > 0 && player.x+player.w > p.x && player.x < p.x+p.w && player.y+player.h > p.y && player.y+player.h < p.y+15) {
+                let j = player.jump;
+                if(player.power === 'jump') { j = -26; player.power = null; }
+                player.vy = j;
+                if(p.id > player.count) { player.count = p.id; document.getElementById('progress-text').innerText = player.count; if(player.count >= 100) win(); }
+            }
+        });
+
+        coins.forEach(c => {
+            if(!c.taken) {
+                let d = Math.hypot(player.x+17-c.x, player.y+17-c.y);
+                if(player.power === 'magnet' && d < 150) { c.x += (player.x+17-c.x)*0.2; c.y += (player.y+17-c.y)*0.2; }
+                if(d < 28) { c.taken=true; player.coins++; if(!isGodMode) totalCoins++; save(); updateUI(); sndCoin.currentTime=0; sndCoin.play(); }
+            }
+        });
+
+        powerups.forEach(p => {
+            if(!p.taken && Math.hypot(player.x+17-p.x, player.y+17-p.y) < 30) { p.taken=true; player.power=p.type; player.powerTimer=500; }
+        });
+
+        if(player.powerTimer > 0) player.powerTimer--; else if(player.power !== 'shield') player.power = null;
+
+        if(player.y > canvas.height) { if(player.power === 'shield') { player.power = null; respawn(); } else die(); }
+        if(player.y < canvas.height*0.4) {
+            let diff = canvas.height*0.4 - player.y; player.y += diff;
+            platforms.forEach(p=>p.y+=diff); coins.forEach(c=>c.y+=diff); powerups.forEach(p=>p.y+=diff);
+        }
+    }
+
+    function die() { 
+        player.lives--; updateUI(); 
+        if(player.lives <= 0) { isRunning = false; if(!canRevive) { document.getElementById('revive-btn').disabled = true; document.getElementById('revive-btn').innerText = "❌"; } document.getElementById('death-screen').style.display = 'flex'; }
+        else respawn(); 
+    }
+
+    function respawn() { let p = platforms.find(p=>p.y > 200 && p.y < canvas.height-100) || platforms[0]; player.y = p.y-100; player.x = p.x; player.vy = 0; }
+
+    function win() { if(currentLevel === unlockedLevels && unlockedLevels < 30) unlockedLevels++; save(); alert("أسطورة!"); showMenu(); }
+
+    function updateUI() {
+        let h = isGodMode ? "∞" : "";
+        if(!isGodMode) for(let i=0; i<player.lives; i++) h += "❤️";
+        document.getElementById('lives-ui').innerText = h || "💔";
+        document.getElementById('lvl-coins').innerText = player.coins;
+        document.getElementById('total-coins-ui').innerText = isGodMode ? "999,999" : totalCoins;
+    }
+
+    function draw() {
+        ctx.clearRect(0,0,canvas.width,canvas.height);
+        ctx.fillStyle='#10b981'; platforms.forEach(p=>ctx.fillRect(p.x, p.y, p.w, p.h));
+        ctx.fillStyle='#fbbf24'; coins.forEach(c=>{ if(!c.taken) { ctx.beginPath(); ctx.arc(c.x, c.y, 7, 0, Math.PI*2); ctx.fill(); } });
+        powerups.forEach(p=>{ if(!p.taken) { ctx.fillStyle=p.type==='magnet'?'red':'#3b82f6'; ctx.fillRect(p.x,p.y,20,20); } });
+        if(player.power) { ctx.strokeStyle='white'; ctx.lineWidth=3; ctx.strokeRect(player.x-4, player.y-4, player.w+8, player.h+8); }
+        ctx.fillStyle = activeSkin; ctx.fillRect(player.x, player.y, player.w, player.h);
+        ctx.fillStyle = 'black'; let eyeX = player.dir === 'right' ? player.x + 22 : player.x + 6; ctx.beginPath(); ctx.arc(eyeX, player.y + 12, 4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    function revive() { if(!canRevive) return; player.lives = 2; canRevive = false; updateUI(); document.getElementById('death-screen').style.display = 'none'; isRunning = true; respawn(); gameLoop(); }
+
+    function enterSecretCode(source) {
+        let code = prompt("الكود:");
+        if(!code) return; code = code.toUpperCase();
+        if(code === "UNLEM") { isGodMode=true; totalCoins=999999; save(); alert("∞"); if(source==='death') revive(); else showMenu(); }
+        else if(code === "FLY66") { if(isGameInitialized) { document.getElementById('death-screen').style.display='none'; win(); } else alert("ادخل لفل!"); }
+    }
+
+    function save() {
+        localStorage.setItem('jump_30_master_lv', unlockedLevels);
+        localStorage.setItem('jump_30_master_coins', totalCoins);
+        localStorage.setItem('jump_30_master_owned', JSON.stringify(ownedSkins));
+        localStorage.setItem('jump_30_master_inv', JSON.stringify(inventory));
+        localStorage.setItem('jump_30_master_skin', activeSkin);
+    }
+
+    function gameLoop() { if(!isRunning) return; update(); draw(); requestAnimationFrame(gameLoop); }
+    function resize() { canvas.width = Math.min(window.innerWidth, 450); canvas.height = window.innerHeight; }
+    function resetData() { if(confirm("تصفير؟")) { localStorage.clear(); location.reload(); } }
+
+    window.addEventListener('keydown', e => keys[e.code]=true);
+    window.addEventListener('keyup', e => keys[e.code]=false);
+    window.addEventListener('resize', resize);
+</script>
+</body>
+</html>
