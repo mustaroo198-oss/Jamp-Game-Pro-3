@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+YPE html>
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
@@ -93,8 +93,8 @@
         </div>
         <canvas id="canvas"></canvas>
         <div id="mobile-controls">
-            <div class="ctrl-btn" onpointerdown="touchX='left'" onpointerup="touchX=null"> < </div>
-            <div class="ctrl-btn" onpointerdown="touchX='right'" onpointerup="touchX=null"> > </div>
+            <div class="ctrl-btn" onpointerdown="touchX='right'" onpointerup="touchX=null">  </div>
+            <div class="ctrl-btn" onpointerdown="touchX='left'" onpointerup="touchX=null">  </div>            
         </div>
     </div>
 </div>
@@ -208,8 +208,8 @@
             let pw = Math.max(45, 85-(diff*40));
             let px = Math.random()*(canvas.width-pw), py = canvas.height-(i*(110+(diff*40)));
             platforms.push({x:px, y:py, w:pw, h:15, id:i});
-            if(Math.random()>0.4) coins.push({x:px+(pw/2), y:py-20, taken:false});
-            if(Math.random()>0.95) powerups.push({x:px+(pw/2)-10, y:py-30, type: Math.random()>0.5?'magnet':'jump', taken:false});
+            if(Math.random()>0.75) coins.push({x:px+(pw/2), y:py-20, taken:false});
+            if(Math.random()>0.75) powerups.push({x:px+(pw/2)-10, y:py-30, type: Math.random()>0.5?'magnet':'jump', taken:false});
         }
         updateUI();
     }
@@ -271,15 +271,47 @@
         document.getElementById('total-coins-ui').innerText = isGodMode ? "999,999" : totalCoins;
     }
 
-    function draw() {
-        ctx.clearRect(0,0,canvas.width,canvas.height);
-        ctx.fillStyle='#10b981'; platforms.forEach(p=>ctx.fillRect(p.x, p.y, p.w, p.h));
-        ctx.fillStyle='#fbbf24'; coins.forEach(c=>{ if(!c.taken) { ctx.beginPath(); ctx.arc(c.x, c.y, 7, 0, Math.PI*2); ctx.fill(); } });
-        powerups.forEach(p=>{ if(!p.taken) { ctx.fillStyle=p.type==='magnet'?'red':'#3b82f6'; ctx.fillRect(p.x,p.y,20,20); } });
-        if(player.power) { ctx.strokeStyle='white'; ctx.lineWidth=3; ctx.strokeRect(player.x-4, player.y-4, player.w+8, player.h+8); }
-        ctx.fillStyle = activeSkin; ctx.fillRect(player.x, player.y, player.w, player.h);
-        ctx.fillStyle = 'black'; let eyeX = player.dir === 'right' ? player.x + 22 : player.x + 6; ctx.beginPath(); ctx.arc(eyeX, player.y + 12, 4, 0, Math.PI * 2); ctx.fill();
+   function draw() {
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    
+    // رسم المنصات (الأرضيات)
+    ctx.fillStyle='#10b981'; 
+    platforms.forEach(p=>ctx.fillRect(p.x, p.y, p.w, p.h));
+    
+    // رسم العملات (الكوينز)
+    ctx.fillStyle='#fbbf24'; 
+    coins.forEach(c=>{ if(!c.taken) { ctx.beginPath(); ctx.arc(c.x, c.y, 7, 0, Math.PI*2); ctx.fill(); } });
+    
+    // --- تعديل شكل المعدات لـ "إيموجي" ---
+    powerups.forEach(p => {
+        if(!p.taken) {
+            ctx.font = '22px Arial'; // حجم الأيقونة
+            ctx.textAlign = 'center';
+            // نختار الإيموجي بناءً على نوع المعدة
+            let emoji = p.type === 'magnet' ? '🧲' : '🚀'; 
+            ctx.fillText(emoji, p.x + 10, p.y + 15); 
+        }
+    });
+    // -------------------------------------
+
+    // لو اللاعب معاه طاقة (تأثير الدرع)
+    if(player.power) { 
+        ctx.strokeStyle='#60a5fa'; // لون أزرق سماوي للدرع
+        ctx.lineWidth=4; 
+        ctx.strokeRect(player.x-5, player.y-5, player.w+10, player.h+10); 
     }
+    
+    // رسم اللاعب
+    ctx.fillStyle = activeSkin; 
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+    
+    // رسم عين اللاعب
+    ctx.fillStyle = 'black'; 
+    let eyeX = player.dir === 'right' ? player.x + 22 : player.x + 6; 
+    ctx.beginPath(); 
+    ctx.arc(eyeX, player.y + 12, 4, 0, Math.PI * 2); 
+    ctx.fill();
+}
 
     function revive() { if(!canRevive) return; player.lives = 2; canRevive = false; updateUI(); document.getElementById('death-screen').style.display = 'none'; isRunning = true; respawn(); gameLoop(); }
 
